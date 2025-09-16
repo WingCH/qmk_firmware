@@ -76,6 +76,12 @@ bool f_dev_reset_press  = 0;
 bool f_rgb_test_press   = 0; 
 bool f_win_lock         = 0; 
 
+// Track the dual-role behavior for MAC_GLOBE_CTRL (tap = globe, hold = Ctrl)
+static bool     mac_globe_ctrl_pressed    = false;
+static bool     mac_globe_ctrl_mod_active = false;
+static uint16_t mac_globe_ctrl_timer      = 0;
+static bool     mac_globe_ctrl_tapped     = false;
+
 void rf_device_init(void);
 void rf_uart_init(void);
 void m_side_led_show(void);
@@ -410,6 +416,18 @@ void m_power_on_dial_sw_scan(void)
  * @brief  qmk process record
  */
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    // Promote the dual-role key to a Ctrl modifier once another key is pressed
+    if (mac_globe_ctrl_pressed && !mac_globe_ctrl_mod_active) {
+        if (keycode != MAC_GLOBE_CTRL && record->event.pressed) {
+            if (mac_globe_ctrl_tapped) {
+                host_consumer_send(0);
+                mac_globe_ctrl_tapped = false;
+            }
+            register_code(KC_LCTL);
+            mac_globe_ctrl_mod_active = true;
+        }
+    }
+
     if(!process_record_user(keycode, record)){
         return false;
     }
@@ -542,6 +560,29 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 host_consumer_send(0x029D);
             } else {
                 host_consumer_send(0);
+            }
+            return false;
+
+        case MAC_GLOBE_CTRL:
+            if (record->event.pressed) {
+                mac_globe_ctrl_pressed    = true;
+                mac_globe_ctrl_mod_active = false;
+                mac_globe_ctrl_timer      = timer_read();
+                mac_globe_ctrl_tapped     = true;
+                // Fire the globe usage immediately for quick tap feedback
+                host_consumer_send(0x029D);
+            } else {
+                if (mac_globe_ctrl_mod_active) {
+                    unregister_code(KC_LCTL);
+                } else {
+                    // Cancel the globe usage we sent on press
+                    if (mac_globe_ctrl_tapped) {
+                        host_consumer_send(0);
+                    }
+                }
+                mac_globe_ctrl_pressed    = false;
+                mac_globe_ctrl_mod_active = false;
+                mac_globe_ctrl_tapped     = false;
             }
             return false;
 
