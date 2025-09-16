@@ -133,18 +133,22 @@
 		"name": "Mac\nSearch",
 		"title": "Mac Search"
 	},
-	{
-		"name": "Mac\nVoice",
-		"title": "Mac Siri Voice"
-	},
-	{
-		"name": "Mac\nConsole",
-		"title": "Mac Console"
-	},
-	{
-		"name": "Mac\nDnt",
-		"title": "Mac Dnt"
-	},
+        {
+            "name": "Mac\nVoice",
+            "title": "Mac Siri Voice"
+        },
+        {
+            "name": "Mac\nConsole",
+            "title": "Mac Console"
+        },
+        {
+            "name": "Mac\nGlobe",
+            "title": "Mac Globe"
+        },
+        {
+            "name": "Mac\nDnt",
+            "title": "Mac Dnt"
+        },
 	{
 		"name": "Print\nWhole",
 		"title": "PrintWhole"
