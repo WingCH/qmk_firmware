@@ -1,107 +1,107 @@
-# NuPhy Halo75 V2 加上 Apple Globe 鍵功能
+# QMK Implementation of Apple Globe Keycap Function
 
-## 問題：缺少 Globe 鍵
+## Problem: Missing Globe Key
 
-買了 NuPhy Halo75 V2 之後發現一個問題：它沒有 Apple 的 Globe 鍵帽。對於經常需要切換中英文輸入法的我來說，這個按鍵已經用習慣了，不想因為換鍵盤就改變操作習慣。
+After buying the NuPhy Halo75 V2, I found one issue: it doesn't have Apple's Globe key. For someone like me who frequently switches between Chinese and English input methods, I'm used to this key and don't want to change my habits just because I switched keyboards.
 
-所以我想找個方法，在這把鍵盤上也能用 Globe 鍵的功能。
+So I wanted to find a way to use Globe key functionality on this keyboard too.
 
-## 想法：合併 Control 和 Globe 功能
+## Idea: Combine Control and Globe Functions
 
-仔細想想，Control 鍵從來不會單獨使用，一定要配合其他按鍵（Ctrl+C、Ctrl+V 等）才有作用。而 Apple 的 Globe 鍵則是單獨按一下就能切換輸入法。
+Thinking about it carefully, the Control key is never used alone - it always needs to be combined with other keys (Ctrl+C, Ctrl+V, etc.) to work. Meanwhile, Apple's Globe key works with just a single press to switch input methods.
 
-既然這兩個功能沒有衝突，我可以讓一個按鍵同時具備兩種功能：
-- 單按 = Globe 鍵（切換輸入法）
-- 長按 + 其他鍵 = Control 功能
+Since these two functions don't conflict, I can make one key have both functions:
+- Single press = Globe key (switch input method)
+- Long press + other keys = Control function
 
-## 實作方法：使用 QMK
+## Implementation: Using QMK
 
-QMK 是一個開源的鍵盤韌體，可以讓我們自定義按鍵功能。這個想法用 QMK 是可以實現的。
+QMK is an open-source keyboard firmware that lets us customize key functions. This idea can be implemented with QMK.
 
-### 第一種方法：自己寫邏輯
+### Method 1: Write Logic Myself
 
-最初我試著自己寫一套雙功能按鍵的邏輯，但程式碼很複雜，要處理各種按鍵時機問題。
+Initially, I tried writing my own dual-function key logic, but the code was very complex and had to handle various timing issues.
 
-### 第二種方法：使用 QMK 內建功能
+### Method 2: Use QMK Built-in Features
 
-後來發現 QMK 本身就有 Mod-Tap 功能。我可以用 `LCTL_T(KC_NO)` 做基礎，然後在偵測到單按時加入 Globe 的功能：
+Later, I discovered that QMK already has Mod-Tap functionality. I can use `LCTL_T(KC_NO)` as a base and add Globe functionality when detecting a single tap:
 
 ```c
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
     if (keycode == LCTL_T(KC_NO)) {
         if (record->tap.count && record->event.pressed) {
-            // 偵測到 tap：發送 Globe 鍵
+            // Detect tap: send Globe key
             host_consumer_send(0x029D);
             return false;
         } else if (record->tap.count && !record->event.pressed) {
-            // Tap 釋放：取消 Globe 信號
+            // Tap release: cancel Globe signal
             host_consumer_send(0);
             return false;
         }
-        // Hold 的情況讓 QMK 自己處理 Control
+        // Let QMK handle Control for hold cases
         return true;
     }
-    // 其他處理...
+    // Other processing...
 }
 ```
 
-這個方案的好處：
-- QMK 負責 tap/hold 偵測
-- 我只需要處理 Globe 功能
-- 程式碼比較簡單
+Benefits of this approach:
+- QMK handles tap/hold detection
+- I only need to handle Globe functionality
+- Code is simpler
 
-## 實際設置方法
+## Setup Methods
 
-### 用 VIA 設置
+### Using VIA
 
-對於不想自己編譯韌體的使用者，可以直接在 VIA 中設置：
+For users who don't want to compile firmware themselves, you can set it up directly in VIA:
 
-1. 打開 VIA 並載入你的鍵盤配置
-2. 進入 **SPECIAL** → **ANY**
-3. 輸入 keycode：**0x2100**
-4. 將它拖到左 Control 的位置
+1. Open VIA and load your keyboard configuration
+2. Go to **SPECIAL** → **ANY**
+3. Enter keycode: **0x2100**
+4. Drag it to the left Control position
 
-**為什麼是 0x2100？**
+**Why 0x2100?**
 
-這個數字來自 QMK 的 keycode 計算：
-- Mod-Tap 基礎值：`0x2000`
-- 左 Control 修飾鍵：`0x0100`
-- KC_NO（無鍵）：`0x00`
-- 總計：`0x2000 + 0x0100 + 0x00 = 0x2100`
+This number comes from QMK's keycode calculation:
+- Mod-Tap base value: `0x2000`
+- Left Control modifier: `0x0100`
+- KC_NO (no key): `0x00`
+- Total: `0x2000 + 0x0100 + 0x00 = 0x2100`
 
-### 測試結果
+### Test Results
 
-設置完成後的體驗讓我非常滿意：
+The experience after setup was very satisfying:
 
-| 操作 | 結果 |
-|------|------|
-| 輕按 | 輸入法選單立即彈出 |
-| 長按 + C | 標準的 Ctrl+C 複製功能 |
-| 長按 + V | 標準的 Ctrl+V 貼上功能 |
-| 長按後放開 | 只有 Control 功能，無多餘動作 |
+| Action | Result |
+|--------|--------|
+| Light press | Input method menu pops up immediately |
+| Long press + C | Standard Ctrl+C copy function |
+| Long press + V | Standard Ctrl+V paste function |
+| Long press then release | Only Control function, no extra actions |
 
-## 使用心得
+## Experience
 
-設置完成後的效果很不錯：
+The results after setup were quite good:
 
-1. **保持原有習慣**：不需要重新學習新的按鍵方式
-2. **功能沒有衝突**：單按和長按分別對應不同功能，使用起來很自然
-3. **善用現有工具**：QMK 的 Mod-Tap 功能很成熟，比自己寫邏輯簡單很多
+1. **Keep original habits**: No need to relearn new key methods
+2. **No function conflicts**: Single press and long press correspond to different functions, feels natural to use
+3. **Make good use of existing tools**: QMK's Mod-Tap feature is mature, much simpler than writing logic myself
 
-對於需要經常切換輸入法的人來說，這個小改動帶來的便利性還是很明顯的。
+For people who frequently need to switch input methods, the convenience this small change brings is quite obvious.
 
-## 總結
+## Summary
 
-這次的改造相對簡單，主要是利用 QMK 的現有功能來解決實際使用需求。
+This modification was relatively simple, mainly using QMK's existing features to solve real usage needs.
 
-NuPhy Halo75 V2 + QMK 的 Mod-Tap 功能 = Globe/Control 雙功能鍵
+NuPhy Halo75 V2 + QMK's Mod-Tap feature = Globe/Control dual-function key
 
-如果你也有類似的需求，可以試試看這個方法。
+If you have similar needs, you can try this method.
 
 ---
 
-**完整的程式碼和設置說明**可以參考我的 [GitHub repository](https://github.com/your-repo)。
+**Complete code and setup instructions** can be found in my [GitHub repository](https://github.com/your-repo).
 
-如果你也有類似的經驗，歡迎分享討論！
+If you have similar experiences, feel free to share and discuss!
 
-#鍵盤 #QMK #客製化 #NuPhy #經驗分享
+#keyboard #QMK #customization #NuPhy #experience
