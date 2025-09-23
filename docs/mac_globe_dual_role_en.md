@@ -7,18 +7,18 @@ I love the NuPhy Halo75 V2, but two things bugged me when hacking on its QMK fir
 1. The stock framework/VIA config doesn’t expose the macOS “Globe” key.
 2. The left Control key feels wasted on its own. I wanted a dual-role key that taps as Globe (for input source switching) and holds as Control for shortcuts.
 
-The solution was to add two custom keycodes:
+The solution was to add one custom keycode and leverage QMK's built-in functionality:
 
 - `MAC_GLOBE`: faithfully mimics the Apple Globe key.
-- `MAC_GLOBE_CTRL`: tap for Globe, hold for Control – a true hybrid.
+- `LCTL_T(KC_NO)`: uses QMK's built-in Mod-Tap feature, tap for Globe, hold for Control – more robust and reliable.
 
 ## Overview of changes
 
 | File | Purpose |
 |------|---------|
-| `keyboards/nuphy/halo75_v2/ansi/ansi.h` | Define `MAC_GLOBE` and `MAC_GLOBE_CTRL` in the custom keycode enum |
-| `keyboards/nuphy/halo75_v2/ansi/ansi.c` | Implement the dual-role logic, juggling Consumer usage 0x029D and Control |
-| `keyboards/nuphy/halo75_v2/ansi/keymaps/via/NuPhy Halo75 via3.json` | Expose the new keycodes in the VIA keymap |
+| `keyboards/nuphy/halo75_v2/ansi/ansi.h` | Removed `MAC_GLOBE_CTRL`, simplified custom keycode definitions |
+| `keyboards/nuphy/halo75_v2/ansi/ansi.c` | Uses QMK's built-in `LCTL_T(KC_NO)` for dual-role, sends Globe Consumer usage on tap |
+| `keyboards/nuphy/halo75_v2/ansi/keymaps/via/NuPhy Halo75 via3.json` | Removed Mac Globe Ctrl entry, now uses standard QMK functionality |
 | `keyboards/nuphy/halo75_v2/nuphy-halo75-v2-via.json` | Provide an official VIA definition with the extra keys |
 
 ## QMK implementation highlights
@@ -29,12 +29,11 @@ The solution was to add two custom keycodes:
 enum custom_keycodes {
     ...
     MAC_GLOBE,
-    MAC_GLOBE_CTRL,
     ...
 };
 ```
 
-They are anchored at `QK_KB_0`, so VIA writes and reads the correct 16-bit values.
+They are anchored at `QK_KB_0`, so VIA writes and reads the correct 16-bit values. Removed `MAC_GLOBE_CTRL` in favor of QMK's built-in solution.
 
 ### `MAC_GLOBE`
 
@@ -50,68 +49,44 @@ case MAC_GLOBE:
     return false;
 ```
 
-### `MAC_GLOBE_CTRL`
+### `LCTL_T(KC_NO)` Integration with Globe Functionality
 
-The dual-role logic fires Globe immediately on press, then promotes to Control if another key joins the party.
+Now using QMK's built-in Mod-Tap feature, sending Globe Consumer usage when tap behavior is detected:
 
 ```c
-static bool     mac_globe_ctrl_pressed    = false;
-static bool     mac_globe_ctrl_mod_active = false;
-static bool     mac_globe_ctrl_tapped     = false;
-
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
-    if (mac_globe_ctrl_pressed && !mac_globe_ctrl_mod_active) {
-        if (keycode != MAC_GLOBE_CTRL && record->event.pressed) {
-            if (mac_globe_ctrl_tapped) {
-                host_consumer_send(0);
-                mac_globe_ctrl_tapped = false;
-            }
-            register_code(KC_LCTL);
-            mac_globe_ctrl_mod_active = true;
+    // Handle LCTL_T(KC_NO) - the 0x2100 keycode for Globe/Ctrl dual function
+    if (keycode == LCTL_T(KC_NO)) {
+        if (record->tap.count && record->event.pressed) {
+            // Tapped: Send Globe consumer key
+            host_consumer_send(0x029D);
+            return false;  // Prevent default processing
+        } else if (record->tap.count && !record->event.pressed) {
+            // Tap released: Cancel Globe consumer key
+            host_consumer_send(0);
+            return false;  // Prevent default processing
         }
+        // For hold (no tap.count), let QMK handle the Ctrl modifier
+        return true;
     }
-
-    switch (keycode) {
-        case MAC_GLOBE_CTRL:
-            if (record->event.pressed) {
-                mac_globe_ctrl_pressed    = true;
-                mac_globe_ctrl_mod_active = false;
-                mac_globe_ctrl_tapped     = true;
-                host_consumer_send(0x029D); // instant Globe feedback
-            } else {
-                if (mac_globe_ctrl_mod_active) {
-                    unregister_code(KC_LCTL);
-                } else if (mac_globe_ctrl_tapped) {
-                    host_consumer_send(0); // pure tap: release Globe
-                }
-                mac_globe_ctrl_pressed    = false;
-                mac_globe_ctrl_mod_active = false;
-                mac_globe_ctrl_tapped     = false;
-            }
-            return false;
-    }
-    return true;
+    // ... other processing
 }
 ```
 
-> Tip: We emit the 0x029D consumer usage on press to keep tap latency near-zero. If a second key appears, we cancel the consumer report and switch to Control.
+> Tip: Using QMK's built-in `LCTL_T` is more stable and reliable. QMK automatically handles tap/hold detection, and we only need to send the Globe usage when a tap is detected.
 
 ## VIA support
 
-Both VIA JSON files list the new entries under `customKeycodes`:
+The VIA JSON file now only includes the Globe key under `customKeycodes`:
 
 ```json
 {
     "name": "Mac\nGlobe",
     "title": "Mac Globe"
-},
-{
-    "name": "Mac\nGlbCtrl",
-    "title": "Mac Globe Ctrl"
 }
 ```
 
-Reload the layout in VIA and you can drag these keys onto any position.
+For the Globe/Ctrl dual-function key, we now use QMK's built-in `LCTL_T(KC_NO)` (keycode: 0x2100), which VIA displays as "LCtl_T(KC_NO)".
 
 ## Build and flash
 
@@ -124,15 +99,36 @@ Flash the resulting `nuphy_halo75_v2_ansi_via.bin`, then try the three scenarios
 | Action | Result |
 |--------|--------|
 | Tap `Mac Globe` | Input source menu pops instantly |
-| Tap `Mac Globe Ctrl` | Same as above |
-| Hold `Mac Globe Ctrl` + C | Sends Control+C |
-| Hold `Mac Globe Ctrl` alone | Releases the Globe usage, no stray Control |
+| Tap `LCTL_T(KC_NO)` | Same as above |
+| Hold `LCTL_T(KC_NO)` + C | Sends Control+C |
+| Hold `LCTL_T(KC_NO)` alone | Only acts as Control, no Globe signal |
+
+## VIA Setup
+
+To use the Globe/Ctrl dual-function key in VIA:
+
+1. Open VIA and load your keyboard layout
+2. Go to the **SPECIAL** tab
+3. Select **ANY**
+4. Enter the keycode: **0x2100**
+5. Drag it to your desired key position
+
+### How 0x2100 is calculated
+
+The keycode `0x2100` comes from QMK's `LCTL_T(KC_NO)` macro:
+
+- `LCTL_T()` creates a Mod-Tap key with Left Control as the modifier
+- `KC_NO` (0x00) is the tap keycode (no key)
+- QMK's Mod-Tap keycodes start at `0x2000`
+- Left Control modifier adds `0x0100`
+- Therefore: `0x2000` + `0x0100` + `0x00` = `0x2100`
 
 ## Takeaways
 
-- QMK’s built-in `MT()`/`LT()` macros are great, but Consumer usages (like 0x029D) need bespoke handling.
-- Firing the Globe usage on press keeps the interaction snappy; just remember to cancel it when you transition to Control.
-- Commenting the state machine up front saves future-me (or future-you) lots of head scratching.
+- Initially tried a custom dual-role implementation, but later found that QMK's built-in `LCTL_T` combined with custom tap handling is more stable and reliable.
+- Using `record->tap.count` accurately detects QMK-recognized tap behavior, avoiding the complexity of implementing custom tap/hold detection.
+- Consumer usages (like 0x029D) still need special handling, but integrating them into QMK's Mod-Tap system works much better.
+- The code becomes cleaner and more maintainable.
 
 ## What’s next?
 
