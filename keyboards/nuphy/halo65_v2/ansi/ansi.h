@@ -16,6 +16,7 @@ enum custom_keycodes {
     MAC_SEARCH,
     MAC_VOICE,
     MAC_CONSOLE,
+    MAC_GLOBE,
     MAC_DND,
     MAC_PRT,
     MAC_PRTA,

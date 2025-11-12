@@ -410,6 +410,21 @@ void m_power_on_dial_sw_scan(void)
  * @brief  qmk process record
  */
 bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    // Handle LCTL_T(KC_NO) - the 0x2100 keycode for Globe/Ctrl dual function
+    if (keycode == LCTL_T(KC_NO)) {
+        if (record->tap.count && record->event.pressed) {
+            // Tapped: Send Globe consumer key
+            host_consumer_send(0x029D);
+            return false;  // Prevent default processing
+        } else if (record->tap.count && !record->event.pressed) {
+            // Tap released: Cancel Globe consumer key
+            host_consumer_send(0);
+            return false;  // Prevent default processing
+        }
+        // For hold (no tap.count), let QMK handle the Ctrl modifier
+        return true;
+    }
+
     if(!process_record_user(keycode, record)){
         return false;
     }
@@ -536,6 +551,15 @@ bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
                 host_consumer_send(0);
             }
             return false;
+
+        case MAC_GLOBE:
+            if (record->event.pressed) {
+                host_consumer_send(0x029D);
+            } else {
+                host_consumer_send(0);
+            }
+            return false;
+
 
         case MAC_DND:
             if (record->event.pressed) {
