@@ -42,6 +42,7 @@ To use the Globe/Ctrl dual-function key in VIA:
 ## Documentation
 
 For detailed implementation information, see:
+- [Halo75 V2 VIA firmware 刷入指引（繁體中文）](../../../../docs/halo75_v2_via_flashing.md)
 - [Mac Globe Dual-Role Documentation (中文)](../../../../docs/mac_globe_dual_role.md)
 - [Mac Globe Dual-Role Documentation (English)](../../../../docs/mac_globe_dual_role_en.md)
 
